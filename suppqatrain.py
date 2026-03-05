@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import openai
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from tavily import AsyncTavilyClient
 
 from openreward.environments import Environment, JSONObject, TextBlock, ToolOutput, tool
@@ -49,6 +49,7 @@ class WebSearchInput(BaseModel):
 
 class FetchUrlInput(BaseModel):
     url: str
+    page: int = Field(default=1, description="Page number to retrieve (1-indexed). Each page contains ~10,000 characters.")
 
 
 class SubmitAnswerInput(BaseModel):
@@ -168,9 +169,11 @@ When you have your answer, submit it using the submit_answer tool."""
     @tool
     async def fetch_url(self, params: FetchUrlInput) -> ToolOutput:
         """
-        Fetch and return the full text content from a specific URL using Tavily's extract method.
-        Use this after web_search to get complete information from a page.
+        Fetch and return the text content from a specific URL using Tavily's extract method.
+        Content is paginated - use the page parameter to retrieve additional pages.
         """
+        PAGE_SIZE = 10000  # Characters per page
+
         try:
             response = await self.tavily_client.extract(urls=[params.url])
 
@@ -185,16 +188,34 @@ When you have your answer, submit it using the submit_answer tool."""
 
             result = results[0]
             raw_content = result.get("raw_content", "")
+            total_length = len(raw_content)
 
-            max_length = 8000
-            if len(raw_content) > max_length:
-                raw_content = raw_content[:max_length] + "...\n[Content truncated]"
+            # Calculate total pages
+            total_pages = max(1, (total_length + PAGE_SIZE - 1) // PAGE_SIZE)
+            page = max(1, min(params.page, total_pages))  # Clamp to valid range
+
+            # Extract the requested page
+            start_idx = (page - 1) * PAGE_SIZE
+            end_idx = min(start_idx + PAGE_SIZE, total_length)
+            page_content = raw_content[start_idx:end_idx]
+
+            # Build display with pagination info
+            if total_pages == 1:
+                display_text = f"Content from {params.url}:\n\n{page_content}"
+            else:
+                display_text = f"Content from {params.url} (Page {page}/{total_pages}):\n\n{page_content}"
+                if page < total_pages:
+                    display_text += f"\n\n[Use fetch_url with page={page + 1} to see more content]"
 
             return ToolOutput(
-                blocks=[TextBlock(text=f"Content from {params.url}:\n\n{raw_content}")],
+                blocks=[TextBlock(text=display_text)],
                 metadata={
                     "url": params.url,
-                    "length": len(raw_content),
+                    "page": page,
+                    "total_pages": total_pages,
+                    "total_length": total_length,
+                    "page_start": start_idx,
+                    "page_end": end_idx,
                 },
                 reward=0.0,
                 finished=False,
