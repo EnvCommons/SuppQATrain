@@ -42,7 +42,7 @@ Each task provides a question and metadata (source DOI, domain, supplementary ty
 
 ## Reward Structure
 
-Reward is sparse and binary, emitted only when the agent calls `submit_answer` (which ends the episode). The `web_search` and `fetch_url` tools always return reward 0.0 and do not end the episode.
+Reward is sparse and binary, emitted only when the agent calls `submit_answer` (which ends the episode). The `web_search` and `web_fetch` tools always return reward 0.0 and do not end the episode.
 
 On submission, the agent's answer is evaluated by an LLM grader (gpt-5-mini) that checks semantic equivalence against the reference answer. The grader accounts for synonyms, abbreviations, equivalent scientific terminology, and minor formatting or rounding differences. For biological sequence answers (DNA, RNA, protein), exact match is required. Empty or whitespace-only submissions receive reward 0.0 without invoking the grader.
 
@@ -57,11 +57,16 @@ Data consists of a single Parquet file (`train.parquet`) containing 999 QA pairs
 
 | Tool | Description |
 |------|-------------|
-| `web_search` | Search the web using Tavily API. Returns up to 5 results with titles, URLs, and snippets. |
-| `fetch_url` | Fetch full text content from a specific URL (truncated at 8000 characters). |
+| `web_search` | Search the web. Returns up to 5 results with titles, URLs, and snippets. |
+| `web_fetch` | Fetch full text content from a specific URL (truncated at 8000 characters). |
 | `submit_answer` | Submit your final answer for LLM grading. Ends the episode. |
 
-Note that the `fetch_url` and `web_search` tools require Tavily, but are optional. If you want to use a different provider for search you can exclude these tools and use external tools instead.
+Search and fetch come from the OpenReward SDK's `WebToolset`, so the provider is configuration on the environment server rather than code here:
+
+| `OPENREWARD_SEARCH_BACKEND` | Backend | Needs |
+|---|---|---|
+| unset (default) | `backsearch` — GR's backdated corpus, bounded to an `as_of` cutoff | `OPENREWARD_API_KEY`, or `api_key` in session secrets |
+| `tavily` | Tavily — live web | `TAVILY_API_KEY`, or `tavily_api_key` in session secrets |
 
 ## Time Horizon
 
@@ -74,11 +79,11 @@ Multi-turn. Agents can perform multiple web searches and URL fetches before subm
 ## Other Environment Requirements
 
 - OpenAI API key required for LLM-based grading. Pass via `secrets={"openai_api_key": "..."}`.
-- Tavily API key required for web search and URL fetching. Pass via `secrets={"tavily_api_key": "..."}`.
+- Search credentials — whichever the configured backend needs: `api_key` for the default backsearch backend, or `tavily_api_key` when the server runs with `OPENREWARD_SEARCH_BACKEND=tavily`. Both fall back to the server process environment (`OPENREWARD_API_KEY` / `TAVILY_API_KEY`).
 
 ## Safety
 
-Agents interact with the public web via the Tavily search and extraction APIs. While the environment is designed for retrieving scientific papers, agents can in principle search for or fetch arbitrary URLs. The environment does not restrict search queries or target domains. No sandbox or file system access is provided, so agents cannot persist data or execute code.
+Agents interact with the web via the SDK's search tools, over whichever backend the server is configured with. While the environment is designed for retrieving scientific papers, agents can in principle search for or fetch arbitrary URLs. The environment does not restrict search queries or target domains. No sandbox or file system access is provided, so agents cannot persist data or execute code.
 
 The questions themselves concern published scientific literature and do not involve sensitive, hazardous, or dual-use information beyond what is already publicly available in peer-reviewed journals.
 

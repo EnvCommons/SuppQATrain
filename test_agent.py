@@ -14,7 +14,9 @@ async def main():
     ENV_NAME = "GeneralReasoning/SuppQATrain"
     SPLIT = "train"
     OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
-    TAVILY_API_KEY = os.environ["TAVILY_API_KEY"]
+    # Optional: whichever the server's OPENREWARD_SEARCH_BACKEND needs.
+    TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
+    OPENREWARD_API_KEY = os.environ.get("OPENREWARD_API_KEY", "")
 
     environment = or_client.environments.get(
         name=ENV_NAME, base_url="http://localhost:8080"
@@ -32,7 +34,8 @@ async def main():
             task=task,
             secrets={
                 "openai_api_key": OPENAI_API_KEY,
-                "tavily_api_key": TAVILY_API_KEY,
+                **({"tavily_api_key": TAVILY_API_KEY} if TAVILY_API_KEY else {}),
+                **({"api_key": OPENREWARD_API_KEY} if OPENREWARD_API_KEY else {}),
             },
         ) as session:
             prompt = await session.get_prompt()
