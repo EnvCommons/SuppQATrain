@@ -302,27 +302,20 @@ Format:
 
 CORRECT or INCORRECT"""
 
-        try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-5-mini",
-                messages=[{"role": "user", "content": grader_prompt}],
-            )
+        response = await self.openai_client.chat.completions.create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": grader_prompt}],
+        )
 
-            grading_response = response.choices[0].message.content or ""
+        grading_response = response.choices[0].message.content or ""
 
-            upper_response = grading_response.upper()
-            is_correct = "CORRECT" in upper_response and "INCORRECT" not in upper_response
+        upper_response = grading_response.upper()
+        is_correct = "CORRECT" in upper_response and "INCORRECT" not in upper_response
 
-            reward = 1.0 if is_correct else 0.0
+        reward = 1.0 if is_correct else 0.0
 
-            return {
-                "is_correct": is_correct,
-                "justification": grading_response,
-                "reward": reward,
-            }
-        except Exception as e:
-            return {
-                "is_correct": False,
-                "justification": f"Grading failed due to error: {str(e)}",
-                "reward": 0.0,
-            }
+        return {
+            "is_correct": is_correct,
+            "justification": grading_response,
+            "reward": reward,
+        }
