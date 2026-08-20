@@ -1,16 +1,37 @@
 from __future__ import annotations
 
+import os
+
 import pandas as pd
 import openai
 from pydantic import BaseModel, Field
 
 from openreward.environments import Environment, JSONObject, TextBlock, ToolOutput, tool
 from openreward.toolsets import WebToolset
+from openreward.tools.search import describe_fetch, describe_search
+
+# This environment searches the live web through Tavily, always. See
+# SuppQATrain.search_backend for the pin that routes every tool call.
+SEARCH_BACKEND = "tavily"
+
+# Anything in this process that resolves a backend without an explicit pin —
+# a bare Search()/Fetch(), a WebToolset built against some other object — reads
+# this rather than falling back to backsearch.
+os.environ["OPENREWARD_SEARCH_BACKEND"] = SEARCH_BACKEND
+
+# WebToolset resolves its tool *descriptions* once, at its own import time, and
+# openreward.environments already pulls that module in — so by the time this
+# file runs, the descriptions are whatever the process environment said, which
+# for backsearch promises results "on or before the configured cutoff date".
+# That is untrue of live-web Tavily, and a model told its sources are bounded
+# will not hedge about post-cutoff information. Re-resolve them against the
+# pinned backend, which is what the SDK itself does at the bottom of that module.
+WebToolset.web_search.__doc__ = describe_search(SEARCH_BACKEND)
+WebToolset.web_fetch.__doc__ = describe_fetch(SEARCH_BACKEND)
 
 
 # ============= Data Loading (module-level) =============
 
-import os
 from pathlib import Path
 
 if Path("/orwd_data/").exists():
@@ -55,13 +76,18 @@ class SuppQATrain(Environment):
     """
 
     # web_search / web_fetch come from the SDK rather than being hand-rolled here.
-    # Which provider answers is process configuration (OPENREWARD_SEARCH_BACKEND,
-    # default "backsearch"), so changing search provider needs no change here.
     #
     # The toolset owns the error split too: an unfetchable page stays tool output
     # the agent can act on, while a missing key or exhausted quota raises so the
     # rollout ends with a blank reward rather than a score that reads as a bad answer.
     toolsets = [WebToolset]
+
+    # Tavily, always. WebToolset reads this hook on every tool call and an explicit
+    # value beats OPENREWARD_SEARCH_BACKEND, so the backend cannot be swapped out
+    # from under the environment by process configuration. Questions here are drawn
+    # from supplementary materials of published papers, which the agent has to reach
+    # on the live web; the default backdated corpus does not carry them.
+    search_backend = SEARCH_BACKEND
 
     # Search hits keep their snippets, as the prompt promises. Off in the SDK by
     # default, which would force a fetch per candidate just to triage results.
@@ -86,9 +112,11 @@ class SuppQATrain(Environment):
             )
 
         # Read live by WebToolset on every tool call, so the search backend takes its
-        # credentials from the session rather than the server process. The configured
-        # backend picks the key it needs: `api_key` for backsearch, `tavily_api_key`
-        # for tavily. No up-front check — which key is required depends on the backend.
+        # credentials from the session rather than the server process. Tavily wants
+        # `tavily_api_key`. No up-front check: the toolset also falls back to the
+        # server process environment (TAVILY_API_KEY), and a genuinely missing key
+        # raises SearchBackendUnavailable at call time, which discards the rollout
+        # rather than scoring it 0.0.
         self.search_secrets = secrets
 
         self.openai_client = openai.AsyncClient(api_key=openai_api_key)

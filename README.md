@@ -57,16 +57,11 @@ Data consists of a single Parquet file (`train.parquet`) containing 999 QA pairs
 
 | Tool | Description |
 |------|-------------|
-| `web_search` | Search the web. Returns up to 5 results with titles, URLs, and snippets. |
-| `web_fetch` | Fetch full text content from a specific URL (truncated at 8000 characters). |
+| `web_search` | Search the live web. Returns up to 8 results with titles, URLs, and snippets. |
+| `web_fetch` | Fetch the readable text of a URL (truncated at 100,000 characters). |
 | `submit_answer` | Submit your final answer for LLM grading. Ends the episode. |
 
-Search and fetch come from the OpenReward SDK's `WebToolset`, so the provider is configuration on the environment server rather than code here:
-
-| `OPENREWARD_SEARCH_BACKEND` | Backend | Needs |
-|---|---|---|
-| unset (default) | `backsearch` — GR's backdated corpus, bounded to an `as_of` cutoff | `OPENREWARD_API_KEY`, or `api_key` in session secrets |
-| `tavily` | Tavily — live web | `TAVILY_API_KEY`, or `tavily_api_key` in session secrets |
+Search and fetch come from the OpenReward SDK's `WebToolset`, pinned to the **Tavily** backend (`search_backend = "tavily"` on the environment class). The pin is read on every tool call and beats the `OPENREWARD_SEARCH_BACKEND` process variable, so the provider cannot be swapped by server configuration: answers here live in supplementary materials of published papers that the agent has to reach on the live web, which the backdated corpus does not carry. Tavily searches the live web and therefore honours no `as_of` cutoff.
 
 ## Time Horizon
 
@@ -79,11 +74,11 @@ Multi-turn. Agents can perform multiple web searches and URL fetches before subm
 ## Other Environment Requirements
 
 - OpenAI API key required for LLM-based grading. Pass via `secrets={"openai_api_key": "..."}`.
-- Search credentials — whichever the configured backend needs: `api_key` for the default backsearch backend, or `tavily_api_key` when the server runs with `OPENREWARD_SEARCH_BACKEND=tavily`. Both fall back to the server process environment (`OPENREWARD_API_KEY` / `TAVILY_API_KEY`).
+- Tavily API key required for `web_search` / `web_fetch`. Pass via `secrets={"tavily_api_key": "..."}`, or fall back to `TAVILY_API_KEY` in the server process environment. A missing or rejected key raises rather than scoring the rollout, so a failed search is discarded as infrastructure failure instead of counting as a wrong answer.
 
 ## Safety
 
-Agents interact with the web via the SDK's search tools, over whichever backend the server is configured with. While the environment is designed for retrieving scientific papers, agents can in principle search for or fetch arbitrary URLs. The environment does not restrict search queries or target domains. No sandbox or file system access is provided, so agents cannot persist data or execute code.
+Agents interact with the live web via the SDK's search tools over Tavily. While the environment is designed for retrieving scientific papers, agents can in principle search for or fetch arbitrary URLs. The environment does not restrict search queries or target domains. No sandbox or file system access is provided, so agents cannot persist data or execute code.
 
 The questions themselves concern published scientific literature and do not involve sensitive, hazardous, or dual-use information beyond what is already publicly available in peer-reviewed journals.
 
