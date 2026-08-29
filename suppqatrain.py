@@ -7,6 +7,10 @@ import openai
 from pydantic import BaseModel, Field
 
 from openreward.environments import Environment, JSONObject, TextBlock, ToolOutput, tool
+
+# Reward for a submission made after the task has already been graded. Negative
+# so repeat submissions are actively discouraged, not merely left unscored.
+REPEAT_SUBMISSION_PENALTY = -0.1
 from openreward.toolsets import WebToolset
 from openreward.tools.search import describe_fetch, describe_search
 
@@ -103,6 +107,11 @@ class SuppQATrain(Environment):
         self.domain = str(task_spec.get("domain", ""))
         self.supp_type = str(task_spec.get("supp_type", ""))
 
+        # Graded submissions this session. Only the first is rewarded: the
+        # feedback prints the reference answer in full, so an uncapped tool
+        # would let the agent read it and resubmit.
+        self.submitted = 0
+
         # Validate API keys from secrets (no env var fallback)
         openai_api_key = secrets.get("openai_api_key")
         if not openai_api_key:
@@ -153,6 +162,16 @@ When you have your answer, submit it using the submit_answer tool."""
         Submit your final answer to the scientific question.
         This tool will grade your answer against the reference answer and end the episode.
         """
+        if self.submitted > 0:
+            return ToolOutput(
+                blocks=[TextBlock(text="An answer has already been submitted for this task. "
+                                       "This episode is over: it is not re-graded, and repeat "
+                                       "submissions are penalised (reward -0.1).")],
+                metadata={"already_submitted": True, "submission_count": self.submitted},
+                reward=REPEAT_SUBMISSION_PENALTY,
+                finished=True,
+            )
+
         grader_result = await self._grade_answer(params.answer)
 
         reward = grader_result["reward"]
@@ -168,6 +187,10 @@ Evaluation:
 
 Reference Answer: {self.answer}
 """
+
+        # Incremented only after grading succeeds, so a grader failure leaves
+        # the attempt retryable.
+        self.submitted += 1
 
         return ToolOutput(
             blocks=[TextBlock(text=display_text)],
