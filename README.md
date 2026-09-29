@@ -44,10 +44,10 @@ Each task provides a question and metadata (source DOI, domain, supplementary ty
 
 Reward is sparse and binary, emitted only when the agent calls `submit_answer` (which ends the episode). The `web_search` and `web_fetch` tools always return reward 0.0 and do not end the episode.
 
-On submission, the agent's answer is evaluated by an LLM grader (gpt-5-mini) that checks semantic equivalence against the reference answer. The grader accounts for synonyms, abbreviations, equivalent scientific terminology, and minor formatting or rounding differences. For biological sequence answers (DNA, RNA, protein), exact match is required. Empty or whitespace-only submissions receive reward 0.0 without invoking the grader.
+On submission, the agent's answer is evaluated by an LLM grader (gpt-5-mini) that checks semantic equivalence against the reference answer. The grader accounts for synonyms, abbreviations, equivalent scientific terminology, and minor formatting or rounding differences. For biological sequence answers (DNA, RNA, protein), exact match is required. Empty or whitespace-only submissions are not graded: they return reward 0.0 without invoking the grader or ending the episode, so the agent can submit again.
 
 - **1.0**: Submitted answer is semantically equivalent to the reference answer
-- **0.0**: Submitted answer is incorrect, missing, or empty
+- **0.0**: Submitted answer is incorrect or missing
 
 ## Data
 
