@@ -172,6 +172,16 @@ When you have your answer, submit it using the submit_answer tool."""
                 finished=True,
             )
 
+        # An empty answer is never sent to the grader, so it is not the graded
+        # attempt and the episode stays open.
+        if not params.answer.strip():
+            return ToolOutput(
+                blocks=[TextBlock(text="Empty answer: nothing was graded. Submit a non-empty answer.")],
+                metadata={"error": "empty_answer"},
+                reward=0.0,
+                finished=False,
+            )
+
         grader_result = await self._grade_answer(params.answer)
 
         reward = grader_result["reward"]
@@ -243,6 +253,10 @@ CORRECT or INCORRECT"""
         grading_response = response.choices[0].message.content or ""
 
         upper_response = grading_response.upper()
+        # A reply with neither label is a grader failure, not a verdict: raise so
+        # the call stays retryable instead of scoring the answer 0.
+        if "CORRECT" not in upper_response:
+            raise RuntimeError("Grader reply had no CORRECT/INCORRECT verdict")
         is_correct = "CORRECT" in upper_response and "INCORRECT" not in upper_response
 
         reward = 1.0 if is_correct else 0.0
