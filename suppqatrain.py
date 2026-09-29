@@ -176,17 +176,10 @@ When you have your answer, submit it using the submit_answer tool."""
 
         reward = grader_result["reward"]
         is_correct = grader_result["is_correct"]
-        justification = grader_result["justification"]
 
-        result_text = "CORRECT" if is_correct else "INCORRECT"
-
-        display_text = f"""{result_text}
-
-Evaluation:
-{justification}
-
-Reference Answer: {self.answer}
-"""
+        # Only the verdict is shown: the grader's justification is written
+        # with the reference answer in view and can restate it.
+        display_text = "CORRECT" if is_correct else "INCORRECT"
 
         # Incremented only after grading succeeds, so a grader failure leaves
         # the attempt retryable.
@@ -197,9 +190,7 @@ Reference Answer: {self.answer}
             metadata={
                 "task_id": self.task_id,
                 "submitted_answer": params.answer,
-                "reference_answer": self.answer,
                 "is_correct": is_correct,
-                "justification": justification,
                 "domain": self.domain,
                 "supp_type": self.supp_type,
             },
