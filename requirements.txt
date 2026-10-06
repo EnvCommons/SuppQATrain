@@ -1,5 +1,5 @@
 fastapi>=0.115.12
-openreward[search]>=0.1.160
+openreward[search]>=0.1.163
 pandas
 pyarrow
 openai>=1.0.0
