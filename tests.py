@@ -16,9 +16,6 @@ import pytest
 HAS_DATA = (Path(__file__).parent / "train.parquet").exists()
 
 
-# ---------------------------------------------------------------------------
-# web_fetch output budget
-# ---------------------------------------------------------------------------
 # Harnesses cap a tool result's serialized size (text blocks + metadata JSON).
 # A fetch of a long page must stay under that cap and still show the page head.
 
