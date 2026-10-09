@@ -14,6 +14,8 @@ REPEAT_SUBMISSION_PENALTY = -0.1
 from openreward.toolsets import WebToolset
 from openreward.tools.search import describe_fetch, describe_search
 
+from web_fetch_cap import CappedWebToolset
+
 # This environment searches the live web through Tavily, always. See
 # SuppQATrain.search_backend for the pin that routes every tool call.
 SEARCH_BACKEND = "tavily"
@@ -32,6 +34,7 @@ os.environ["OPENREWARD_SEARCH_BACKEND"] = SEARCH_BACKEND
 # pinned backend, which is what the SDK itself does at the bottom of that module.
 WebToolset.web_search.__doc__ = describe_search(SEARCH_BACKEND)
 WebToolset.web_fetch.__doc__ = describe_fetch(SEARCH_BACKEND)
+CappedWebToolset.web_fetch.__doc__ = describe_fetch(SEARCH_BACKEND)
 
 
 # ============= Data Loading (module-level) =============
@@ -84,7 +87,9 @@ class SuppQATrain(Environment):
     # The toolset owns the error split too: an unfetchable page stays tool output
     # the agent can act on, while a missing key or exhausted quota raises so the
     # rollout ends with a blank reward rather than a score that reads as a bad answer.
-    toolsets = [WebToolset]
+    # CappedWebToolset keeps each web_fetch result inside the tool-output budget
+    # (see web_fetch_cap.py).
+    toolsets = [CappedWebToolset]
 
     # Tavily, always. WebToolset reads this hook on every tool call and an explicit
     # value beats OPENREWARD_SEARCH_BACKEND, so the backend cannot be swapped out
