@@ -1,6 +1,6 @@
 # SuppQATrain
 
-[![OpenReward Environment](https://img.shields.io/badge/%E2%AD%90%20OpenReward-Environment-f7e6cc)](https://openreward.ai/GeneralReasoning/SuppQATrain)
+[![⭐ OpenReward Environment](https://img.shields.io/badge/%E2%AD%90%20OpenReward-Environment-f7e6cc)](https://openreward.ai/GeneralReasoning/SuppQATrain)
 
 ## Description
 
@@ -49,9 +49,11 @@ On submission, the agent's answer is evaluated by an LLM grader (gpt-5-mini) tha
 - **1.0**: Submitted answer is semantically equivalent to the reference answer
 - **0.0**: Submitted answer is incorrect or missing
 
+Only the first non-empty submission is graded; a later `submit_answer` call returns a reward of -0.1.
+
 ## Data
 
-Data consists of a single Parquet file (`train.parquet`) containing 999 QA pairs generated from supplementary materials of papers published in trusted journals (Nature, Nature Communications, Scientific Reports, PLOS, Science, PNAS, and others). Each row contains a question, answer, source DOI, key passage from supplementary material, domain, and supplementary type. Data is stored on the OpenReward platform.
+Data consists of a single Parquet file (`train.parquet`) containing 999 QA pairs generated with gpt-4.1 from supplementary materials of papers published in trusted journals (Nature, Nature Communications, Scientific Reports, PLOS, Science, PNAS, and others). Each row contains a question, answer, source DOI, key passage from supplementary material, domain, and supplementary type. Data is stored on the OpenReward platform.
 
 ## Tools
 
@@ -61,20 +63,16 @@ Data consists of a single Parquet file (`train.parquet`) containing 999 QA pairs
 | `web_fetch` | Fetch the readable text of a URL (truncated at 100,000 characters). |
 | `submit_answer` | Submit your final answer for LLM grading. Ends the episode. |
 
-Search and fetch come from the OpenReward SDK's `WebToolset`, pinned to the **Tavily** backend (`search_backend = "tavily"` on the environment class). The pin is read on every tool call and beats the `OPENREWARD_SEARCH_BACKEND` process variable, so the provider cannot be swapped by server configuration: answers here live in supplementary materials of published papers that the agent has to reach on the live web, which the backdated corpus does not carry. Tavily searches the live web and therefore honours no `as_of` cutoff.
+Search and fetch come from the OpenReward SDK's `WebToolset`, pinned to the **Tavily** backend (`search_backend = "tavily"` on the environment class). Live web search is required because the answers live in supplementary materials of published papers, which the backdated corpus does not carry. Tavily searches the live web and honours no `as_of` cutoff.
 
 ## Time Horizon
 
 Multi-turn. Agents can perform multiple web searches and URL fetches before submitting a final answer.
 
-## Environment Difficulty
-
-[To be determined]
-
 ## Other Environment Requirements
 
 - OpenAI API key required for LLM-based grading. Pass via `secrets={"openai_api_key": "..."}`.
-- Tavily API key required for `web_search` / `web_fetch`. Pass via `secrets={"tavily_api_key": "..."}`, or fall back to `TAVILY_API_KEY` in the server process environment. A missing or rejected key raises rather than scoring the rollout, so a failed search is discarded as infrastructure failure instead of counting as a wrong answer.
+- Tavily API key required for `web_search` / `web_fetch`. Pass via `secrets={"tavily_api_key": "..."}`. A missing or rejected key raises an error rather than scoring the rollout as a wrong answer.
 
 ## Safety
 
